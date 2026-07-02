@@ -172,6 +172,21 @@ create_socket(int domain, int proto, const char *local, const char *bind_dev, in
         }
     }
 
+    /* Set SO_REUSEADDR when --cport is used, so bind() succeeds even if
+     * a previous connection on this port is still in TIME_WAIT. */
+    if (local_port) {
+	int opt = 1;
+	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+	    saved_errno = errno;
+	    close(s);
+	    if (local)
+		freeaddrinfo(local_res);
+	    freeaddrinfo(server_res);
+	    errno = saved_errno;
+	    return -1;
+	}
+    }
+
     /* Bind the local address if given a name (with or without --cport) */
     if (local) {
         if (local_port) {
