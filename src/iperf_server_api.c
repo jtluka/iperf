@@ -235,9 +235,24 @@ iperf_handle_message_server(struct iperf_test *test)
             cpu_util(test->cpu_util);
             test->stats_callback(test);
             SLIST_FOREACH(sp, &test->streams, streams) {
+                int rc;
+                sp->done = 1;
+                rc = pthread_cancel(sp->thr);
+                if (rc != 0 && rc != ESRCH) {
+                    i_errno = IEPTHREADCANCEL;
+                    errno = rc;
+                    iperf_err(test, "iperf_handle_message_server in pthread_cancel - %s", iperf_strerror(i_errno));
+                }
+                rc = pthread_join(sp->thr, NULL);
+                if (rc != 0 && rc != ESRCH) {
+                    i_errno = IEPTHREADJOIN;
+                    errno = rc;
+                    iperf_err(test, "iperf_handle_message_server in pthread_join - %s", iperf_strerror(i_errno));
+                }
                 FD_CLR(sp->socket, &test->read_set);
                 FD_CLR(sp->socket, &test->write_set);
                 close(sp->socket);
+                sp->socket = -1;
             }
             test->reporter_callback(test);
 	    if (iperf_set_send_state(test, EXCHANGE_RESULTS) != 0)
